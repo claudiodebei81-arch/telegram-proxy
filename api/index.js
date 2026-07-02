@@ -11,41 +11,47 @@ module.exports = async (req, res) => {
     return res.status(204).end();
   }
 
-  // 2. Estrai il token del bot Telegram
+  // 2. Estrai il token del bot Telegram e il metodo dai parametri query
+  // req.url contiene il path di riscrittura interna (es. /api?token=...&method=...)
   let botToken = req.headers["x-bot-token"];
+  let method = "";
+  let queryString = "";
 
-  // Leggi il path originale: Vercel esegue la riscrittura interna modificando req.url
-  // ma passa il path originale nel parametro query 'path' grazie alla regola in vercel.json.
-  let path = "";
   try {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-    path = parsedUrl.searchParams.get("path") || req.url || "";
-  } catch (e) {
-    path = req.url || "";
-  }
-
-  if (!botToken) {
-    // Estrai dal path (es. /bot123456:ABC.../getMe oppure /123456:ABC.../getMe)
-    const m = path.match(/^\/(?:bot)?([^/]+)(\/.*)?$/);
-    if (m) {
-      botToken = m[1];
+    
+    if (!botToken) {
+      botToken = parsedUrl.searchParams.get("token");
     }
+    method = parsedUrl.searchParams.get("method") || "";
+
+    // Ricostruisci gli eventuali altri parametri query originari (escludendo token e method)
+    const queryParams = new URLSearchParams(parsedUrl.search);
+    queryParams.delete("token");
+    queryParams.delete("method");
+    const qStr = queryParams.toString();
+    queryString = qStr ? "?" + qStr : "";
+  } catch (e) {
+    console.error("URL parsing error:", e);
   }
 
-  // 3. Verifica di sicurezza
+  // 3. Verifiche di sicurezza
   if (ALLOWED_BOT_TOKEN && botToken !== ALLOWED_BOT_TOKEN) {
     return res.status(401).json({ ok: false, error: "Unauthorized: invalid or missing bot token" });
   }
 
   if (!botToken) {
-    return res.status(400).json({ ok: false, error: "Missing bot token. Pass it via X-Bot-Token header or path." });
+    return res.status(400).json({ ok: false, error: "Missing bot token." });
   }
 
-  // 4. Costruisci l'URL finale per Telegram
-  const upstreamPath = path.replace(/^\/(?:bot)?[^/]+/, "");
-  const upstreamUrl = `https://api.telegram.org/bot${botToken}${upstreamPath}`;
+  if (!method) {
+    return res.status(400).json({ ok: false, error: "Missing method." });
+  }
 
-  // 5. Clona gli header originali per inoltrarli a Telegram (escludendo quelli locali/host)
+  // 4. Costruisci l'URL finale verso Telegram
+  const upstreamUrl = `https://api.telegram.org/bot${botToken}/${method}${queryString}`;
+
+  // 5. Clona gli header originali per inoltrarli a Telegram
   const headers = {};
   const skipHeaders = new Set([
     "host",
@@ -65,8 +71,6 @@ module.exports = async (req, res) => {
 
   try {
     // 6. Inoltra la richiesta a Telegram
-    // Usando bodyParser: false, passiamo direttamente lo stream originale di Node (req)
-    // Questo garantisce compatibilità al 100% anche con upload di file/immagini (multipart/form-data)
     const options = {
       method: req.method,
       headers: headers,
@@ -89,7 +93,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Inoltra il body di risposta come buffer
+    // Inoltra il body come buffer
     const responseData = await upstreamResponse.arrayBuffer();
     return res.send(Buffer.from(responseData));
 

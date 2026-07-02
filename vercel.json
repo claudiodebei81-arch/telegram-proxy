@@ -2,8 +2,8 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/:path*",
-      "destination": "/api?path=/:path*"
+      "source": "/bot:token/:method*",
+      "destination": "/api?token=:token&method=:method*"
     }
   ]
 }
