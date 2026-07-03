@@ -79,6 +79,7 @@ module.exports = async (req, res) => {
 
     if (req.method !== "GET" && req.method !== "HEAD") {
       options.body = req;
+      options.duplex = "half";
     }
 
     const upstreamResponse = await fetch(upstreamUrl, options);
