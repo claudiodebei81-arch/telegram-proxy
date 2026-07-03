@@ -4,6 +4,10 @@
     {
       "source": "/bot:token/:method*",
       "destination": "/api?token=:token&method=:method*"
+    },
+    {
+      "source": "/:token/:method*",
+      "destination": "/api?token=:token&method=:method*"
     }
   ]
 }
