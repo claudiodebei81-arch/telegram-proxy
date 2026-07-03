@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/bot:token/:method*",
-      "destination": "/api/index.js?token=:token&method=:method*"
+      "destination": "/api?token=:token&method=:method*"
     }
   ]
 }
